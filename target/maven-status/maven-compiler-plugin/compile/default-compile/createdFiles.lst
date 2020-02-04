@@ -1,0 +1,8 @@
+com\azure\cosmos\sample\common\Families.class
+com\azure\cosmos\sample\common\Pet.class
+com\azure\cosmos\sample\common\AccountSettings.class
+com\azure\cosmos\sample\common\Family.class
+com\azure\cosmos\sample\common\Child.class
+com\azure\cosmos\sample\sync\SyncMain.class
+com\azure\cosmos\sample\common\Parent.class
+com\azure\cosmos\sample\common\Address.class
