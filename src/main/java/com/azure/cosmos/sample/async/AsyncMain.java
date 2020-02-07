@@ -1,20 +1,25 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-package com.azure.cosmos.sample.sync;
+package com.azure.cosmos.sample.async;
 
 import com.azure.cosmos.ConnectionPolicy;
 import com.azure.cosmos.ConsistencyLevel;
-import com.azure.cosmos.CosmosClient;
+//import com.azure.cosmos.CosmosClient;
+import com.azure.cosmos.CosmosAsyncClient;
 import com.azure.cosmos.CosmosClientBuilder;
 import com.azure.cosmos.CosmosClientException;
-import com.azure.cosmos.CosmosContainer;
+//import com.azure.cosmos.CosmosContainer;
+import com.azure.cosmos.CosmosAsyncContainer;
 import com.azure.cosmos.CosmosContainerProperties;
-import com.azure.cosmos.CosmosDatabase;
-import com.azure.cosmos.CosmosItem;
+//import com.azure.cosmos.CosmosDatabase;
+import com.azure.cosmos.CosmosAsyncDatabase;
+//import com.azure.cosmos.CosmosItem;
+import com.azure.cosmos.CosmosAsyncItem;
 import com.azure.cosmos.CosmosItemProperties;
 import com.azure.cosmos.CosmosItemRequestOptions;
-import com.azure.cosmos.CosmosItemResponse;
+//import com.azure.cosmos.CosmosItemResponse;
+import com.azure.cosmos.CosmosAsyncItemResponse;
 import com.azure.cosmos.FeedOptions;
 import com.azure.cosmos.FeedResponse;
 import com.azure.cosmos.Resource;
@@ -29,15 +34,15 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.stream.Collectors;
 
-public class SyncMain {
+public class AsyncMain {
 
-    private CosmosClient client;
+    private CosmosAsyncClient client;
 
     private final String databaseName = "AzureSampleFamilyDB";
     private final String containerName = "FamilyContainer";
 
-    private CosmosDatabase database;
-    private CosmosContainer container;
+    private CosmosAsyncDatabase database;
+    private CosmosAsyncContainer container;
 
     public void close() {
         client.close();
@@ -75,16 +80,16 @@ public class SyncMain {
         //  West US is just an example. User should set preferred location to the Cosmos DB region closest to the application
         defaultPolicy.setPreferredLocations(Lists.newArrayList("West US"));
 
-        //  Create sync client
-        //  <CreateSyncClient>
+        //  Create async client
+        //  <CreateAsyncClient>
         client = new CosmosClientBuilder()
             .setEndpoint(AccountSettings.HOST)
             .setKey(AccountSettings.MASTER_KEY)
             .setConnectionPolicy(defaultPolicy)
             .setConsistencyLevel(ConsistencyLevel.EVENTUAL)
-            .buildClient();
+            .buildAsyncClient();
 
-        //  </CreateSyncClient>
+        //  </CreateAsyncClient>
 
         createDatabaseIfNotExists();
         createContainerIfNotExists();
@@ -110,6 +115,16 @@ public class SyncMain {
 
         //  Create database if not exists
         //  <CreateDatabaseIfNotExists>
+
+
+        
+
+        Mono<CosmosAsyncDatabase> databaseIfNotExists = createDatabaseIfNotExists();
+        databaseIfNotExists.flatMap(x -> {
+            createContainerIfNotExists();
+            return Mono.just(x);
+        });
+
         database = client.createDatabaseIfNotExists(databaseName).getDatabase();
         //  </CreateDatabaseIfNotExists>
 
@@ -141,7 +156,7 @@ public class SyncMain {
             //  Use lastName as partitionKey for cosmos item
             //  Using appropriate partition key improves the performance of database operations
             CosmosItemRequestOptions cosmosItemRequestOptions = new CosmosItemRequestOptions(family.getLastName());
-            CosmosItemResponse item = container.createItem(family, cosmosItemRequestOptions);
+            CosmosAsyncItemResponse item = container.createItem(family, cosmosItemRequestOptions);
             //  </CreateItem>
 
             //  Get request charge and other properties like latency, and diagnostics strings, etc.
@@ -161,9 +176,9 @@ public class SyncMain {
         //  This will help fast look up of items because of partition key
         familiesToCreate.forEach(family -> {
             //  <ReadItem>
-            CosmosItem item = container.getItem(family.getId(), family.getLastName());
+            CosmosAsyncItem item = container.getItem(family.getId(), family.getLastName());
             try {
-                CosmosItemResponse read = item.read(new CosmosItemRequestOptions(family.getLastName()));
+                CosmosAsyncItemResponse read = item.read(new CosmosItemRequestOptions(family.getLastName()));
                 double requestCharge = read.getRequestCharge();
                 Duration requestLatency = read.getRequestLatency();
                 System.out.println(String.format("Item successfully read with id %s with a charge of %.2f and within duration %s",
