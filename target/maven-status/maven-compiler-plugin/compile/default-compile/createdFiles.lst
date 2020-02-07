@@ -1,4 +1,5 @@
 com\azure\cosmos\sample\common\Families.class
+com\azure\cosmos\sample\async\AsyncMain.class
 com\azure\cosmos\sample\common\Pet.class
 com\azure\cosmos\sample\common\AccountSettings.class
 com\azure\cosmos\sample\common\Family.class
