@@ -34,6 +34,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxOperator;
 import reactor.core.publisher.MonoProcessor;
 import reactor.core.publisher.FluxProcessor;
+import reactor.*;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -98,15 +99,14 @@ public class AsyncMain {
 
         //  </CreateAsyncClient>
 
-        createDatabaseIfNotExists();
-        createContainerIfNotExists();
+        createDatabaseIfNotExists().subscribe(s -> {}, err -> {}, () -> {});
+        createContainerIfNotExists().subscribe(s -> {}, err -> {}, () -> {});
 
         //  Setup family items to create
-        ArrayList<Family> familiesToCreate = new ArrayList<>();
-        familiesToCreate.add(Families.getAndersenFamilyItem());
-        familiesToCreate.add(Families.getWakefieldFamilyItem());
-        familiesToCreate.add(Families.getJohnsonFamilyItem());
-        familiesToCreate.add(Families.getSmithFamilyItem());
+        Flux<Family> familiesToCreate = Flux.just(Families.getAndersenFamilyItem(),
+                                                  Families.getWakefieldFamilyItem(),
+                                                  Families.getJohnsonFamilyItem(),
+                                                  Families.getSmithFamilyItem());
 
         createFamilies(familiesToCreate);
 
@@ -150,29 +150,35 @@ public class AsyncMain {
         //  </CreateContainerIfNotExists>
     }
 
-    private void createFamilies(List<Family> families) throws Exception {
-        double totalRequestCharge = 0;
-        for (Family family : families) {
+    private void createFamilies(Flux<Family> families) throws Exception {
 
-            //  <CreateItem>
-            //  Create item using container that we created using sync client
+        double total_charge=0.0;
 
-            //  Use lastName as partitionKey for cosmos item
-            //  Using appropriate partition key improves the performance of database operations
-            CosmosItemRequestOptions cosmosItemRequestOptions = new CosmosItemRequestOptions(family.getLastName());
-            CosmosAsyncItemResponse item = container.createItem(family, cosmosItemRequestOptions);
-            //  </CreateItem>
-
-            //  Get request charge and other properties like latency, and diagnostics strings, etc.
-            System.out.println(String.format("Created item with request charge of %.2f within" +
+        //  <CreateItem>
+        //  Combine multiple item inserts, associated success println's, and a final aggregate stats println into one Reactive stream.
+        families.flatMap(fm -> {
+                CosmosItemRequestOptions cosmosItemRequestOptions = new CosmosItemRequestOptions(fm.getLastName());
+                return container.createItem(fm, cosmosItemRequestOptions);
+            }) //Flux of item request responses
+            .flatMap(itr -> {
+                System.out.println(String.format("Created item with request charge of %.2f within" +
                     " duration %s",
-                item.getRequestCharge(), item.getRequestLatency()));
-            totalRequestCharge += item.getRequestCharge();
-        }
-        System.out.println(String.format("Created %d items with total request " +
-                "charge of %.2f",
-            families.size(),
-            totalRequestCharge));
+                    itr.getRequestCharge(), itr.getRequestLatency()));
+                return Mono.just(itr.getRequestCharge());
+            }) //Flux of request charges
+            .reduce(0.0, 
+                (chg1,chg2) -> chg1 + chg2
+            ) //Mono of total charge - there will be only one item in this stream
+            .subscribe(s -> {
+                    total_charge=s;
+                }, 
+                err -> {}, 
+                () -> {
+                    System.out.println(String.format("Created %d items with total request " +
+                        "charge of %.2f",
+                        families.count(),
+                        total_charge));                    
+            }); //Subscriber preserves the total charge and prints aggregate charge/item count stats on complete.
     }
 
     private void readItems(ArrayList<Family> familiesToCreate) {
