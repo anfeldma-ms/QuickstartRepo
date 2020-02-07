@@ -18,7 +18,6 @@ import com.azure.cosmos.CosmosAsyncDatabase;
 import com.azure.cosmos.CosmosAsyncDatabaseResponse;
 //import com.azure.cosmos.CosmosItem;
 import com.azure.cosmos.CosmosAsyncItem;
-import com.azure.cosmos.CosmosAsyncItemResponse;
 import com.azure.cosmos.CosmosItemProperties;
 import com.azure.cosmos.CosmosItemRequestOptions;
 import com.azure.cosmos.FeedOptions;
@@ -29,17 +28,10 @@ import com.azure.cosmos.sample.common.Families;
 import com.azure.cosmos.sample.common.Family;
 import com.google.common.collect.Lists;
 import reactor.core.publisher.Mono;
-import reactor.core.publisher.MonoOperator;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.FluxOperator;
-import reactor.core.publisher.MonoProcessor;
-import reactor.core.publisher.FluxProcessor;
-import reactor.*;
+
 
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
 import java.util.stream.Collectors;
 
 public class AsyncMain {
@@ -204,7 +196,8 @@ public class AsyncMain {
                                     itr.getItem().getId(), requestCharge, requestLatency));
                             },
                             err -> {
-                                err.printStackTrace();
+                                CosmosClientException cerr = (CosmosClientException)err;
+                                cerr.printStackTrace();
                                 System.err.println(String.format("Read Item failed with %s", err));
                             },
                             () -> {}
