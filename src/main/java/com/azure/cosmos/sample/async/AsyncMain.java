@@ -11,15 +11,16 @@ import com.azure.cosmos.CosmosClientBuilder;
 import com.azure.cosmos.CosmosClientException;
 //import com.azure.cosmos.CosmosContainer;
 import com.azure.cosmos.CosmosAsyncContainer;
+import com.azure.cosmos.CosmosAsyncContainerResponse;
 import com.azure.cosmos.CosmosContainerProperties;
 //import com.azure.cosmos.CosmosDatabase;
 import com.azure.cosmos.CosmosAsyncDatabase;
+import com.azure.cosmos.CosmosAsyncDatabaseResponse;
 //import com.azure.cosmos.CosmosItem;
 import com.azure.cosmos.CosmosAsyncItem;
+import com.azure.cosmos.CosmosAsyncItemResponse;
 import com.azure.cosmos.CosmosItemProperties;
 import com.azure.cosmos.CosmosItemRequestOptions;
-//import com.azure.cosmos.CosmosItemResponse;
-import com.azure.cosmos.CosmosAsyncItemResponse;
 import com.azure.cosmos.FeedOptions;
 import com.azure.cosmos.FeedResponse;
 import com.azure.cosmos.Resource;
@@ -27,6 +28,12 @@ import com.azure.cosmos.sample.common.AccountSettings;
 import com.azure.cosmos.sample.common.Families;
 import com.azure.cosmos.sample.common.Family;
 import com.google.common.collect.Lists;
+import reactor.core.publisher.Mono;
+import reactor.core.publisher.MonoOperator;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.FluxOperator;
+import reactor.core.publisher.MonoProcessor;
+import reactor.core.publisher.FluxProcessor;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -55,7 +62,7 @@ public class AsyncMain {
      */
     //  <Main>
     public static void main(String[] args) {
-        SyncMain p = new SyncMain();
+        AsyncMain p = new AsyncMain();
 
         try {
             p.getStartedDemo();
@@ -110,40 +117,37 @@ public class AsyncMain {
         queryItems();
     }
 
-    private void createDatabaseIfNotExists() throws Exception {
+    private Mono<CosmosAsyncDatabase> createDatabaseIfNotExists() throws Exception {
         System.out.println("Create database " + databaseName + " if not exists.");
 
         //  Create database if not exists
         //  <CreateDatabaseIfNotExists>
-
-
-        
-
-        Mono<CosmosAsyncDatabase> databaseIfNotExists = createDatabaseIfNotExists();
-        databaseIfNotExists.flatMap(x -> {
-            createContainerIfNotExists();
-            return Mono.just(x);
+        Mono<CosmosAsyncDatabaseResponse> databaseIfNotExists = client.createDatabaseIfNotExists(databaseName);
+        return databaseIfNotExists.flatMap(x -> {
+            database = x.getDatabase();
+            System.out.println("Checking database " + database.getId() + " completed!\n");
+            return Mono.just(database);
         });
-
-        database = client.createDatabaseIfNotExists(databaseName).getDatabase();
         //  </CreateDatabaseIfNotExists>
-
-        System.out.println("Checking database " + database.getId() + " completed!\n");
     }
 
-    private void createContainerIfNotExists() throws Exception {
+    private Mono<CosmosAsyncContainer> createContainerIfNotExists() throws Exception {
         System.out.println("Create container " + containerName + " if not exists.");
 
         //  Create container if not exists
         //  <CreateContainerIfNotExists>
-        CosmosContainerProperties containerProperties =
-            new CosmosContainerProperties(containerName, "/lastName");
 
+        CosmosContainerProperties containerProperties = new CosmosContainerProperties(containerName, "/lastName");
+        Mono<CosmosAsyncContainerResponse> containerIfNotExists = database.createContainerIfNotExists(containerProperties, 400);
+        
         //  Create container with 400 RU/s
-        container = database.createContainerIfNotExists(containerProperties, 400).getContainer();
-        //  </CreateContainerIfNotExists>
+        return containerIfNotExists.flatMap(x -> {
+            container = x.getContainer();
+            System.out.println("Checking container " + container.getId() + " completed!\n");
+            return Mono.just(container);
+        });
 
-        System.out.println("Checking container " + container.getId() + " completed!\n");
+        //  </CreateContainerIfNotExists>
     }
 
     private void createFamilies(List<Family> families) throws Exception {
