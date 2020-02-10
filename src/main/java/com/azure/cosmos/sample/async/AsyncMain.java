@@ -198,7 +198,7 @@ public class AsyncMain {
                             err -> {
                                 CosmosClientException cerr = (CosmosClientException)err;
                                 cerr.printStackTrace();
-                                System.err.println(String.format("Read Item failed with %s", err));
+                                System.err.println(String.format("Read Item failed with %s", cerr));
                             },
                             () -> {}
         );
