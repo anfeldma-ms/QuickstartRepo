@@ -93,8 +93,13 @@ public class AsyncMain {
 
         //  </CreateAsyncClient>
 
-        createDatabaseIfNotExists().subscribe(s -> {}, err -> {}, () -> {});
-        createContainerIfNotExists().subscribe(s -> {}, err -> {}, () -> {});
+        createDatabaseIfNotExists().block();
+        createContainerIfNotExists().block();
+
+        // UX study
+        // Create async client (blocking)
+        // Create DB, container if not exists (blocking)
+        // Create items: asynchronous; main loop latches on create operations
 
         //  Setup family items to create
         Flux<Family> familiesToCreate = Flux.just(Families.getAndersenFamilyItem(),
@@ -104,6 +109,8 @@ public class AsyncMain {
 
         createFamilies(familiesToCreate);
 
+        //latch
+
         familiesToCreate = Flux.just(Families.getAndersenFamilyItem(),
             Families.getWakefieldFamilyItem(),
             Families.getJohnsonFamilyItem(),
@@ -111,6 +118,8 @@ public class AsyncMain {
 
         System.out.println("Reading items.");
         readItems(familiesToCreate);
+
+        //latch
 
         System.out.println("Querying items.");
         queryItems();
@@ -167,16 +176,16 @@ public class AsyncMain {
                 (chg1,chg2) -> chg1 + chg2
             ) //Mono of total charge - there will be only one item in this stream
             .flatMap(chg -> {
-                total_charge=chg;
-                return Mono.empty();
+                return Mono.just(chg);
             })
-            .subscribe(s -> {}, 
+            .subscribe(chg -> { 
+                System.out.println(String.format("Created %d items with total request " +
+                "charge of %.2f",
+                families.count(),
+                chg));                                    
+            }, 
                 err -> {}, 
                 () -> {
-                    System.out.println(String.format("Created %d items with total request " +
-                        "charge of %.2f",
-                        families.count(),
-                        total_charge));                    
             }); //Subscriber preserves the total charge and prints aggregate charge/item count stats on complete.
     }
 
@@ -196,9 +205,13 @@ public class AsyncMain {
                                     itr.getItem().getId(), requestCharge, requestLatency));
                             },
                             err -> {
-                                CosmosClientException cerr = (CosmosClientException)err;
-                                cerr.printStackTrace();
-                                System.err.println(String.format("Read Item failed with %s", cerr));
+                                /*if (err instanceof CosmosClientException) {
+                                    CosmosClientException cerr = (CosmosClientException)err;
+                                    cerr.printStackTrace();
+                                    System.err.println(String.format("Read Item failed with %s", cerr));
+                                } else {*/
+                                    err.printStackTrace();
+                                //}
                             },
                             () -> {}
         );
