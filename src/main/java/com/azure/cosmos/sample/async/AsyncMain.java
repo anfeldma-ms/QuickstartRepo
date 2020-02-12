@@ -5,18 +5,14 @@ package com.azure.cosmos.sample.async;
 
 import com.azure.cosmos.ConnectionPolicy;
 import com.azure.cosmos.ConsistencyLevel;
-//import com.azure.cosmos.CosmosClient;
 import com.azure.cosmos.CosmosAsyncClient;
 import com.azure.cosmos.CosmosClientBuilder;
 import com.azure.cosmos.CosmosClientException;
-//import com.azure.cosmos.CosmosContainer;
 import com.azure.cosmos.CosmosAsyncContainer;
 import com.azure.cosmos.CosmosAsyncContainerResponse;
 import com.azure.cosmos.CosmosContainerProperties;
-//import com.azure.cosmos.CosmosDatabase;
 import com.azure.cosmos.CosmosAsyncDatabase;
 import com.azure.cosmos.CosmosAsyncDatabaseResponse;
-//import com.azure.cosmos.CosmosItem;
 import com.azure.cosmos.CosmosAsyncItem;
 import com.azure.cosmos.CosmosItemProperties;
 import com.azure.cosmos.CosmosItemRequestOptions;
@@ -31,6 +27,7 @@ import reactor.core.publisher.Mono;
 import reactor.core.publisher.Flux;
 
 
+import java.util.concurrent.CountDownLatch;
 import java.time.Duration;
 import java.util.stream.Collectors;
 
@@ -43,8 +40,6 @@ public class AsyncMain {
 
     private CosmosAsyncDatabase database;
     private CosmosAsyncContainer container;
-
-    private double total_charge;
 
     public void close() {
         client.close();
@@ -93,13 +88,8 @@ public class AsyncMain {
 
         //  </CreateAsyncClient>
 
-        createDatabaseIfNotExists().block();
-        createContainerIfNotExists().block();
-
-        // UX study
-        // Create async client (blocking)
-        // Create DB, container if not exists (blocking)
-        // Create items: asynchronous; main loop latches on create operations
+        createDatabaseIfNotExists();
+        createContainerIfNotExists();
 
         //  Setup family items to create
         Flux<Family> familiesToCreate = Flux.just(Families.getAndersenFamilyItem(),
@@ -109,8 +99,6 @@ public class AsyncMain {
 
         createFamilies(familiesToCreate);
 
-        //latch
-
         familiesToCreate = Flux.just(Families.getAndersenFamilyItem(),
             Families.getWakefieldFamilyItem(),
             Families.getJohnsonFamilyItem(),
@@ -119,27 +107,25 @@ public class AsyncMain {
         System.out.println("Reading items.");
         readItems(familiesToCreate);
 
-        //latch
-
         System.out.println("Querying items.");
         queryItems();
     }
 
-    private Mono<CosmosAsyncDatabase> createDatabaseIfNotExists() throws Exception {
+    private void createDatabaseIfNotExists() throws Exception {
         System.out.println("Create database " + databaseName + " if not exists.");
 
         //  Create database if not exists
         //  <CreateDatabaseIfNotExists>
         Mono<CosmosAsyncDatabaseResponse> databaseIfNotExists = client.createDatabaseIfNotExists(databaseName);
-        return databaseIfNotExists.flatMap(x -> {
+        databaseIfNotExists.flatMap(x -> {
             database = x.getDatabase();
             System.out.println("Checking database " + database.getId() + " completed!\n");
-            return Mono.just(database);
-        });
+            return Mono.empty();
+        }).block();
         //  </CreateDatabaseIfNotExists>
     }
 
-    private Mono<CosmosAsyncContainer> createContainerIfNotExists() throws Exception {
+    private void createContainerIfNotExists() throws Exception {
         System.out.println("Create container " + containerName + " if not exists.");
 
         //  Create container if not exists
@@ -149,11 +135,11 @@ public class AsyncMain {
         Mono<CosmosAsyncContainerResponse> containerIfNotExists = database.createContainerIfNotExists(containerProperties, 400);
         
         //  Create container with 400 RU/s
-        return containerIfNotExists.flatMap(x -> {
+        containerIfNotExists.flatMap(x -> {
             container = x.getContainer();
             System.out.println("Checking container " + container.getId() + " completed!\n");
-            return Mono.just(container);
-        });
+            return Mono.empty();
+        }).block();
 
         //  </CreateContainerIfNotExists>
     }
@@ -161,6 +147,9 @@ public class AsyncMain {
     private void createFamilies(Flux<Family> families) throws Exception {
 
         //  <CreateItem>
+
+        final CountDownLatch completionLatch = new CountDownLatch(1);
+
         //  Combine multiple item inserts, associated success println's, and a final aggregate stats println into one Reactive stream.
         families.flatMap(fm -> {
                 CosmosItemRequestOptions cosmosItemRequestOptions = new CosmosItemRequestOptions(fm.getLastName());
@@ -182,17 +171,26 @@ public class AsyncMain {
                 System.out.println(String.format("Created %d items with total request " +
                 "charge of %.2f",
                 families.count(),
-                chg));                                    
+                chg));         
+                
+                completionLatch.countDown();
             }, 
-                err -> {}, 
+                err -> {completionLatch.countDown();}, 
                 () -> {
             }); //Subscriber preserves the total charge and prints aggregate charge/item count stats on complete.
+
+        completionLatch.await();
+
+        //  </CreateItem>            
     }
 
     private void readItems(Flux<Family> familiesToCreate) {
         //  Using partition key for point read scenarios.
         //  This will help fast look up of items because of partition key
         //  <ReadItem>
+
+        final CountDownLatch completionLatch = new CountDownLatch(1);
+        
         familiesToCreate.flatMap(fm -> {
                             CosmosAsyncItem item = container.getItem(fm.getId(), fm.getLastName());
                             return item.read(new CosmosItemRequestOptions(fm.getLastName()));
@@ -203,18 +201,27 @@ public class AsyncMain {
                                 Duration requestLatency = itr.getRequestLatency();
                                 System.out.println(String.format("Item successfully read with id %s with a charge of %.2f and within duration %s",
                                     itr.getItem().getId(), requestCharge, requestLatency));
+
+                                completionLatch.countDown();
                             },
                             err -> {
-                                /*if (err instanceof CosmosClientException) {
+                                if (err instanceof CosmosClientException) {
+                                    //Client-specific errors
                                     CosmosClientException cerr = (CosmosClientException)err;
                                     cerr.printStackTrace();
-                                    System.err.println(String.format("Read Item failed with %s", cerr));
-                                } else {*/
+                                    System.err.println(String.format("Read Item failed with %s\n", cerr));
+                                } else {
+                                    //General errors
                                     err.printStackTrace();
-                                //}
+                                }
+
+                                completionLatch.countDown();
                             },
                             () -> {}
         );
+
+        completionLatch.await();
+
         //  </ReadItem>
     }
 
@@ -231,20 +238,40 @@ public class AsyncMain {
         Flux<FeedResponse<CosmosItemProperties>> pagedFluxResponse = container.queryItems(
             "SELECT * FROM Family WHERE Family.lastName IN ('Andersen', 'Wakefield', 'Johnson')", queryOptions);
 
+        final CountDownLatch completionLatch = new CountDownLatch(1);
+
         pagedFluxResponse.subscribe(
             fr -> {
                 System.out.println("Got a page of query result with " +
-                fr.getResults().size() + " items(s)"
-                + " and request charge of " + fr.getRequestCharge());
-            System.out.println("Item Ids " + fr
-                .getResults()
-                .stream()
-                .map(Resource::getId)
-                .collect(Collectors.toList()));
+                    fr.getResults().size() + " items(s)"
+                    + " and request charge of " + fr.getRequestCharge());
+
+                System.out.println("Item Ids " + fr
+                    .getResults()
+                    .stream()
+                    .map(Resource::getId)
+                    .collect(Collectors.toList()));
+
+                completionLatch.await();
             },
-            err -> {},
+            err -> {
+                if (err instanceof CosmosClientException) {
+                    //Client-specific errors
+                    CosmosClientException cerr = (CosmosClientException)err;
+                    cerr.printStackTrace();
+                    System.err.println(String.format("Read Item failed with %s\n", cerr));
+                } else {
+                    //General errors
+                    err.printStackTrace();
+                }
+
+                completionLatch.countDown();
+            },
             () -> {}
         );
-        //  </QueryItems>
+
+        completionLatch.await();
+
+        // </QueryItems>
     }
 }
