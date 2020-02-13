@@ -92,23 +92,23 @@ public class AsyncMain {
         createDatabaseIfNotExists();
         createContainerIfNotExists();
 
-        Family AndersenFamilyItem=Families.getAndersenFamilyItem();
-        Family WakefieldFamilyItem=Families.getWakefieldFamilyItem();
-        Family JohnsonFamilyItem=Families.getJohnsonFamilyItem();
-        Family SmithFamilyItem=Families.getSmithFamilyItem();
+        Family andersenFamilyItem=Families.getAndersenFamilyItem();
+        Family wakefieldFamilyItem=Families.getWakefieldFamilyItem();
+        Family johnsonFamilyItem=Families.getJohnsonFamilyItem();
+        Family smithFamilyItem=Families.getSmithFamilyItem();
 
         //  Setup family items to create
-        Flux<Family> familiesToCreate = Flux.just(AndersenFamilyItem,
-                                            WakefieldFamilyItem,
-                                            JohnsonFamilyItem,
-                                            SmithFamilyItem);
+        Flux<Family> familiesToCreate = Flux.just(andersenFamilyItem,
+                                            wakefieldFamilyItem,
+                                            johnsonFamilyItem,
+                                            smithFamilyItem);
 
         createFamilies(familiesToCreate);
 
-        familiesToCreate = Flux.just(AndersenFamilyItem,
-                                WakefieldFamilyItem,
-                                JohnsonFamilyItem,
-                                SmithFamilyItem);
+        familiesToCreate = Flux.just(andersenFamilyItem,
+                                wakefieldFamilyItem,
+                                johnsonFamilyItem,
+                                smithFamilyItem);
 
         System.out.println("Reading items.");
         readItems(familiesToCreate);
