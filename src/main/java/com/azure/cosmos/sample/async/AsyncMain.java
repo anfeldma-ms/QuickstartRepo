@@ -123,8 +123,8 @@ public class AsyncMain {
         //  Create database if not exists
         //  <CreateDatabaseIfNotExists>
         Mono<CosmosAsyncDatabaseResponse> databaseIfNotExists = client.createDatabaseIfNotExists(databaseName);
-        databaseIfNotExists.flatMap(x -> {
-            database = x.getDatabase();
+        databaseIfNotExists.flatMap(databaseResponse -> {
+            database = databaseResponse.getDatabase();
             System.out.println("Checking database " + database.getId() + " completed!\n");
             return Mono.empty();
         }).block();
@@ -141,8 +141,8 @@ public class AsyncMain {
         Mono<CosmosAsyncContainerResponse> containerIfNotExists = database.createContainerIfNotExists(containerProperties, 400);
         
         //  Create container with 400 RU/s
-        containerIfNotExists.flatMap(x -> {
-            container = x.getContainer();
+        containerIfNotExists.flatMap(containerResponse -> {
+            container = containerResponse.getContainer();
             System.out.println("Checking container " + container.getId() + " completed!\n");
             return Mono.empty();
         }).block();
@@ -157,23 +157,23 @@ public class AsyncMain {
         final CountDownLatch completionLatch = new CountDownLatch(1);
 
         //  Combine multiple item inserts, associated success println's, and a final aggregate stats println into one Reactive stream.
-        families.flatMap(fm -> {
-                CosmosItemRequestOptions cosmosItemRequestOptions = new CosmosItemRequestOptions(fm.getLastName());
-                return container.createItem(fm, cosmosItemRequestOptions);
+        families.flatMap(family -> {
+                CosmosItemRequestOptions cosmosItemRequestOptions = new CosmosItemRequestOptions(family.getLastName());
+                return container.createItem(family, cosmosItemRequestOptions);
             }) //Flux of item request responses
-            .flatMap(itr -> {
+            .flatMap(itemResponse -> {
                 System.out.println(String.format("Created item with request charge of %.2f within" +
                     " duration %s",
-                    itr.getRequestCharge(), itr.getRequestLatency()));
-                System.out.println(String.format("Item ID: %s\n", itr.getItem().getId()));
-                return Mono.just(itr.getRequestCharge());
+                    itemResponse.getRequestCharge(), itemResponse.getRequestLatency()));
+                System.out.println(String.format("Item ID: %s\n", itemResponse.getItem().getId()));
+                return Mono.just(itemResponse.getRequestCharge());
             }) //Flux of request charges
             .reduce(0.0, 
-                (chg1,chg2) -> chg1 + chg2
+                (charge_n,charge_nplus1) -> charge_n + charge_nplus1
             ) //Mono of total charge - there will be only one item in this stream            
-            .subscribe(chg -> { 
+            .subscribe(charge -> { 
                 System.out.println(String.format("Created items with total request charge of %.2f\n",
-                chg));         
+                charge));         
             }, 
                 err -> {
                     if (err instanceof CosmosClientException) {
@@ -207,16 +207,16 @@ public class AsyncMain {
 
         final CountDownLatch completionLatch = new CountDownLatch(1);
         
-        familiesToCreate.flatMap(fm -> {
-                            CosmosAsyncItem item = container.getItem(fm.getId(), fm.getLastName());
-                            return item.read(new CosmosItemRequestOptions(fm.getLastName()));
+        familiesToCreate.flatMap(family -> {
+                            CosmosAsyncItem item = container.getItem(family.getId(), family.getLastName());
+                            return item.read(new CosmosItemRequestOptions(family.getLastName()));
                         })
                         .subscribe(
-                            itr -> {
-                                double requestCharge = itr.getRequestCharge();
-                                Duration requestLatency = itr.getRequestLatency();
+                            itemResponse -> {
+                                double requestCharge = itemResponse.getRequestCharge();
+                                Duration requestLatency = itemResponse.getRequestLatency();
                                 System.out.println(String.format("Item successfully read with id %s with a charge of %.2f and within duration %s",
-                                    itr.getItem().getId(), requestCharge, requestLatency));
+                                    itemResponse.getItem().getId(), requestCharge, requestLatency));
                             },
                             err -> {
                                 if (err instanceof CosmosClientException) {
@@ -260,12 +260,12 @@ public class AsyncMain {
         final CountDownLatch completionLatch = new CountDownLatch(1);
 
         pagedFluxResponse.subscribe(
-            fr -> {
+            fluxResponse -> {
                 System.out.println("Got a page of query result with " +
-                    fr.getResults().size() + " items(s)"
-                    + " and request charge of " + fr.getRequestCharge());
+                    fluxResponse.getResults().size() + " items(s)"
+                    + " and request charge of " + fluxResponse.getRequestCharge());
 
-                System.out.println("Item Ids " + fr
+                System.out.println("Item Ids " + fluxResponse
                     .getResults()
                     .stream()
                     .map(Resource::getId)
