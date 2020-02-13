@@ -163,23 +163,32 @@ public class AsyncMain {
             }) //Flux of request charges
             .reduce(0.0, 
                 (chg1,chg2) -> chg1 + chg2
-            ) //Mono of total charge - there will be only one item in this stream
-            .flatMap(chg -> {
-                return Mono.just(chg);
-            })
+            ) //Mono of total charge - there will be only one item in this stream            
             .subscribe(chg -> { 
-                System.out.println(String.format("Created %d items with total request " +
-                "charge of %.2f",
-                families.count(),
+                System.out.println(String.format("Created items with total request charge of %.2f\n",
                 chg));         
-                
-                completionLatch.countDown();
             }, 
-                err -> {completionLatch.countDown();}, 
-                () -> {
-            }); //Subscriber preserves the total charge and prints aggregate charge/item count stats on complete.
+                err -> {
+                    if (err instanceof CosmosClientException) {
+                        //Client-specific errors
+                        CosmosClientException cerr = (CosmosClientException)err;
+                        cerr.printStackTrace();
+                        System.err.println(String.format("Read Item failed with %s\n", cerr));
+                    } else {
+                        //General errors
+                        err.printStackTrace();
+                    }
 
-        completionLatch.await();
+                    completionLatch.countDown();                    
+                }, 
+                () -> {completionLatch.countDown();}
+        ); //Preserve the total charge and print aggregate charge/item count stats.
+
+        try {
+            completionLatch.await();            
+        } catch (InterruptedException err) {
+            throw new AssertionError("Unexpected Interruption",err);
+        }
 
         //  </CreateItem>            
     }
@@ -201,8 +210,6 @@ public class AsyncMain {
                                 Duration requestLatency = itr.getRequestLatency();
                                 System.out.println(String.format("Item successfully read with id %s with a charge of %.2f and within duration %s",
                                     itr.getItem().getId(), requestCharge, requestLatency));
-
-                                completionLatch.countDown();
                             },
                             err -> {
                                 if (err instanceof CosmosClientException) {
@@ -217,7 +224,7 @@ public class AsyncMain {
 
                                 completionLatch.countDown();
                             },
-                            () -> {}
+                            () -> {completionLatch.countDown();}
         );
 
         try {
@@ -255,8 +262,6 @@ public class AsyncMain {
                     .stream()
                     .map(Resource::getId)
                     .collect(Collectors.toList()));
-
-                completionLatch.countDown();
             },
             err -> {
                 if (err instanceof CosmosClientException) {
@@ -271,7 +276,7 @@ public class AsyncMain {
 
                 completionLatch.countDown();
             },
-            () -> {}
+            () -> {completionLatch.countDown();}
         );
 
         try {
