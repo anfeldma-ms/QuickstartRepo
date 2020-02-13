@@ -220,7 +220,11 @@ public class AsyncMain {
                             () -> {}
         );
 
-        completionLatch.await();
+        try {
+            completionLatch.await();             
+        } catch (InterruptedException err) {
+            throw new AssertionError("Unexpected Interruption",err);
+        }
 
         //  </ReadItem>
     }
@@ -252,7 +256,7 @@ public class AsyncMain {
                     .map(Resource::getId)
                     .collect(Collectors.toList()));
 
-                completionLatch.await();
+                completionLatch.countDown();
             },
             err -> {
                 if (err instanceof CosmosClientException) {
@@ -270,7 +274,11 @@ public class AsyncMain {
             () -> {}
         );
 
-        completionLatch.await();
+        try {
+            completionLatch.await();             
+        } catch (InterruptedException err) {
+            throw new AssertionError("Unexpected Interruption",err);
+        }
 
         // </QueryItems>
     }
