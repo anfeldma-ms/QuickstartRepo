@@ -30,6 +30,7 @@ import reactor.core.publisher.Flux;
 import java.util.concurrent.CountDownLatch;
 import java.time.Duration;
 import java.util.stream.Collectors;
+import java.util.List;
 
 public class AsyncMain {
 
@@ -91,18 +92,23 @@ public class AsyncMain {
         createDatabaseIfNotExists();
         createContainerIfNotExists();
 
+        Family AndersenFamilyItem=Families.getAndersenFamilyItem();
+        Family WakefieldFamilyItem=Families.getWakefieldFamilyItem();
+        Family JohnsonFamilyItem=Families.getJohnsonFamilyItem();
+        Family SmithFamilyItem=Families.getSmithFamilyItem();
+
         //  Setup family items to create
-        Flux<Family> familiesToCreate = Flux.just(Families.getAndersenFamilyItem(),
-                                                  Families.getWakefieldFamilyItem(),
-                                                  Families.getJohnsonFamilyItem(),
-                                                  Families.getSmithFamilyItem());
+        Flux<Family> familiesToCreate = Flux.just(AndersenFamilyItem,
+                                            WakefieldFamilyItem,
+                                            JohnsonFamilyItem,
+                                            SmithFamilyItem);
 
         createFamilies(familiesToCreate);
 
-        familiesToCreate = Flux.just(Families.getAndersenFamilyItem(),
-            Families.getWakefieldFamilyItem(),
-            Families.getJohnsonFamilyItem(),
-            Families.getSmithFamilyItem());
+        familiesToCreate = Flux.just(AndersenFamilyItem,
+                                WakefieldFamilyItem,
+                                JohnsonFamilyItem,
+                                SmithFamilyItem);
 
         System.out.println("Reading items.");
         readItems(familiesToCreate);
@@ -159,6 +165,7 @@ public class AsyncMain {
                 System.out.println(String.format("Created item with request charge of %.2f within" +
                     " duration %s",
                     itr.getRequestCharge(), itr.getRequestLatency()));
+                System.out.println(String.format("Item ID: %s\n", itr.getItem().getId()));
                 return Mono.just(itr.getRequestCharge());
             }) //Flux of request charges
             .reduce(0.0, 
@@ -247,6 +254,7 @@ public class AsyncMain {
         queryOptions.populateQueryMetrics(true);
 
         Flux<FeedResponse<CosmosItemProperties>> pagedFluxResponse = container.queryItems(
+            //"SELECT * FROM Family WHERE Family.lastName IN ('Andersen', 'Wakefield', 'Johnson')", queryOptions);
             "SELECT * FROM Family WHERE Family.lastName IN ('Andersen', 'Wakefield', 'Johnson')", queryOptions);
 
         final CountDownLatch completionLatch = new CountDownLatch(1);
